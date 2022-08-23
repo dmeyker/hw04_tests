@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+{% load static %}
+<div class="container py-5"> 
+  <h1>Привет, я автор проекта, Дарья Мейкер</h1>
+  <p>
+  В постоянных поисках себя, душевного равновесия и интересных задач. А еще у меня есть гит. Жми на котика!
+  </p>
+  <a href="https://github.com/Dmeyker">
+    <img src="{% static 'img/cat.jpeg' %}" width="100" height="100" class="d-inline-block align-top" alt="">
+  </a>
+</div>
+{% endblock %}
