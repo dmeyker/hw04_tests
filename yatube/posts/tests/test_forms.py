@@ -1,3 +1,4 @@
+from http import HTTPStatus
 import shutil
 import tempfile
 
@@ -14,7 +15,7 @@ TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
-class PostCreateFormTests(TestCase):
+class PostFormTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -24,11 +25,6 @@ class PostCreateFormTests(TestCase):
             description='Тестовое описание'
         )
         cls.user = User.objects.create_user(username='user_test')
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Тестовый пост',
-            group=cls.group,
-        )
 
     @classmethod
     def tearDownClass(cls):
@@ -36,76 +32,63 @@ class PostCreateFormTests(TestCase):
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
+        self.guest_client = Client()
         self.authorized_client = Client()
-        self.authorized_client.force_login(PostCreateFormTests.user)
+        self.authorized_client.force_login(PostFormTests.user)
 
     def test_create_post(self):
         """Валидная форма создает запись в Post."""
-        post_count = Post.objects.count()
-
-        form_fields = {
-            'text': PostCreateFormTests.post.text,
-            'group': PostCreateFormTests.group.pk,
-        }
         response = self.authorized_client.post(
             reverse('posts:post_create'),
-            data=form_fields,
+            data={'text': 'Test post', 'group': PostFormTests.group.id},
             follow=True
-        )
-        self.assertRedirects(response, reverse(
-            'posts:profile',
-            kwargs={'username': PostCreateFormTests.user.username}))
-        self.assertEqual(Post.objects.count(), post_count + 1)
-        self.assertTrue(
-            Post.objects.filter(
-                group=PostCreateFormTests.group.pk,
-                text=PostCreateFormTests.post.text,
-            ).exists()
-        )
+)
 
-    def test_cant_create_post_without_text(self):
-        """Форма не создает запись в Post без текста."""
-        post_count = Post.objects.count()
-        form_fields = {
-            'text': '',
-            'group': PostCreateFormTests.group.pk,
-        }
-        response = self.authorized_client.post(
-            reverse('posts:post_create'),
-            data=form_fields,
-            follow=True
-        )
-        self.assertEqual(Post.objects.count(), post_count)
-        self.assertFormError(
-            response,
-            'form',
-            'text',
-            'Обязательное поле.'
-        )
+        self.assertEqual(response.status_code, HTTPStatus.OK) 
+        self.assertEqual(Post.objects.count(), 1) 
+        post = Post.objects.first()
+        self.assertEqual(post.text, 'Test post')
+        self.assertEqual(post.author, self.user)
+        self.assertEqual(post.group, PostFormTests.group) 
+ 
 
     def test_edit_post(self):
-        """Валидная форма создает запись в Post."""
-        post_count = Post.objects.count()
-        form_fields = {
-            'text': 'Тестовый текст изм',
-            'group': PostCreateFormTests.group.pk,
-        }
-        response = self.authorized_client.post(
-            reverse('posts:post_edit',
-                    kwargs={'post_id': PostCreateFormTests.post.id}),
-            data=form_fields,
-            follow=True
-        )
-        self.assertRedirects(response, reverse(
-            'posts:post_detail',
-            kwargs={'post_id': PostCreateFormTests.post.id}))
+        """Валидная форма редактирует запись в Post."""
+        post = Post.objects.create(
+            text='test',
+            author=self.user,
+            group=PostFormTests.group
+)
+        new_post_text = 'new text'
+        new_group = Group.objects.create(
+            title='New Test group',
+            slug='new-test-group',
+            description='new test description'
+)       
+        self.authorized_client.post(
+            reverse('posts:post_edit', args=[post.id,]),
+            data={'text': new_post_text, 'group': new_group.id},
+            follow=True,
+) 
+        self.assertEqual(Post.objects.count(), 1)
+        post = Post.objects.first()
+        self.assertEqual(post.text, new_post_text)
+        self.assertEqual(post.author, self.user)
+        self.assertEqual(post.group, new_group) 
+        """Проверка, что поста нет в прошлой группе"""
+        old_group_response = self.authorized_client.get(
+            reverse('posts:group_list', args=[self.group.slug,])
+)
 
-        self.assertEqual(Post.objects.count(), post_count)
+        self.assertEqual(old_group_response.context['page_obj'].paginator.count, 0)
 
-        self.assertTrue(
-            Post.objects.filter(
-                group=PostCreateFormTests.group.pk,
-                text=form_fields['text'],
-                id=PostCreateFormTests.post.id,
-            ).exists()
-        )
+    def test_unauth_user_cant_publish_post(self):
+        """Неавторизованный юзер при попытке создать запись
+        направляется на страницу авторизации
+        """
+        posts_count = Post.objects.count()
+        response = self.guest_client.post(
+            reverse('posts:post_create'),
+            follow=True)
+        self.assertRedirects(response, '/auth/login/?next=/create/')
+        self.assertEqual(posts_count, Post.objects.count())

@@ -38,7 +38,9 @@ def profile(request, username):
 
 def post_detail(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
+    author = post.author
     context = {
+        'author': author,
         'post': post
     }
     return render(request, 'posts/post_detail.html', context)
@@ -53,7 +55,10 @@ def post_create(request):
             post.author = request.user
             post.save()
             return redirect('posts:profile', post.author)
-    return render(request, 'posts/create_post.html', {'form': form})
+    context = {
+        'is_edit': False
+    }
+    return render(request, 'posts/create_post.html', {'form': form}, context)
 
 
 @login_required

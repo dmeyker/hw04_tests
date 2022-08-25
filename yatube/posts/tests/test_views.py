@@ -52,7 +52,7 @@ class PostPagesTests(TestCase):
                 self.assertTemplateUsed(response, template)
 
 
-class ContextTest(TestCase):
+class TestPosts(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -73,17 +73,35 @@ class ContextTest(TestCase):
             group=cls.group,
         )
 
+    def check_context_contains_page_or_post(self, context, post=False):
+        if post:
+            self.assertIn('post', context)
+            post = context['post']
+        else:
+            self.assertIn('page_obj', context)
+            post = context['page_obj'][0]
+        self.assertEqual(post.author, TestPosts.user2)
+        self.assertEqual(post.pub_date, TestPosts.post.pub_date)
+        self.assertEqual(post.text, TestPosts.post.text)
+        self.assertEqual(post.group, TestPosts.post.group) 
+
     def test_correct_context_index(self):
         """Проверка index."""
         response = self.authorized_client_author.get(reverse('posts:index'))
-        self.assertIsInstance(response.context['page_obj'][0], Post)
+        self.check_context_contains_page_or_post(response.context)
 
     def test_correct_context_group_list(self):
         """Проверка group_list."""
         response = self.authorized_client_author.get(
             reverse('posts:group_list', kwargs={'slug': self.group.slug})
         )
-        self.assertEqual(response.context['group'], self.group)
+        self.check_context_contains_page_or_post(response.context)
+
+        self.assertIn('group', response.context)
+        group = response.context['group']
+        self.assertEqual(group.title, TestPosts.group.title)
+        self.assertEqual(group.description, TestPosts.group.description) 
+        
 
     def test_correct_context_profile(self):
         """Проверка profile."""
@@ -93,70 +111,54 @@ class ContextTest(TestCase):
                 kwargs={'username': self.user2.username}
             )
         )
-        self.assertEqual(response.context['user'], self.user2)
+        self.check_context_contains_page_or_post(response.context)
+
+        self.assertIn('author', response.context)
+        self.assertEqual(response.context['author'], TestPosts.user2) 
 
     def test_correct_context_post_detail(self):
         """Проверка post_detail."""
         response = self.authorized_client_author.get(
             reverse('posts:post_detail', kwargs={'post_id': self.post.id})
         )
-        self.assertEqual(response.context['post'].text, self.post.text)
+        self.check_context_contains_page_or_post(response.context, post=True)
 
-    def test_correct_context_post_edit(self):
-        """Проверка post_edit."""
+        self.assertIn('author', response.context)
+        self.assertEqual(response.context['author'], TestPosts.user2) 
+
+    def test_correct_context_post_edit_create(self):
+        """Проверка post_edit и create."""
         response = self.authorized_client_author.get(
             reverse('posts:post_edit', kwargs={'post_id': self.post.id})
         )
-        self.assertEqual(
-            response.context['form'].initial['text'],
-            self.post.text
-        )
-
-    def test_correct_context_post_create(self):
-        """Проверка post_create."""
-        response = self.authorized_client_author.get(
-            reverse('posts:post_create')
-        )
+        self.assertIn('form', response.context)
         self.assertIsInstance(response.context['form'], PostForm)
 
+        self.assertIn('is_edit', response.context)
+        is_edit = response.context['is_edit']
+        self.assertIsInstance(is_edit, bool)
+        self.assertEqual(is_edit, True) 
 
-class CreatePostTest(TestCase):
+
+class PaginatorViewsTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.user = User.objects.create_user(username='test_user')
+        cls.authorized_client = Client()
+        cls.authorized_client.force_login(cls.user)
+        for count in range(14):
+            cls.post = Post.objects.create(
+                text=f'Тестовый пост номер {count}',
+                author=cls.user)
 
-        cls.user = User.objects.create_user(username='user_test')
-        cls.authorized_client_author = Client()
-        cls.authorized_client_author.force_login(cls.user)
+    def test_first_page_contains_ten_records(self):
+        response = self.authorized_client.get(
+                reverse('posts:index'))
+        self.assertEqual(len(response.context.get('page_obj').object_list), 10)
 
-        cls.group = Group.objects.create(
-            title='Заголовок группы',
-            description='Описание группы',
-            slug='test-slug',
+    def test_second_page_contains_four_records(self):
+        response = self.authorized_client.get(
+            reverse('posts:index') + '?page=2'
         )
-        cls.post = Post.objects.create(
-            text='Текст',
-            author=cls.user,
-            group=cls.group,
-        )
-
-    def test_correct_post_create_index(self):
-        """После создания появился на главной, в группе и профиле."""
-        pages_names = (
-            reverse('posts:index'),
-            reverse(
-                'posts:group_list',
-                kwargs={'slug': self.group.slug}
-            ),
-            reverse(
-                'posts:profile',
-                kwargs={'username': self.user.username}
-            ),
-        )
-
-        for name_page in pages_names:
-            with self.subTest(name_page=name_page):
-                response = self.authorized_client_author.get(name_page)
-                self.assertTrue(
-                    response.context['page_obj'][0]
-                )
+        self.assertEqual(len(response.context.get('page_obj').object_list), 4)
