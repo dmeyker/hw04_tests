@@ -83,7 +83,7 @@ class TestPosts(TestCase):
         self.assertEqual(post.author, TestPosts.user2)
         self.assertEqual(post.pub_date, TestPosts.post.pub_date)
         self.assertEqual(post.text, TestPosts.post.text)
-        self.assertEqual(post.group, TestPosts.post.group) 
+        self.assertEqual(post.group, TestPosts.post.group)
 
     def test_correct_context_index(self):
         """Проверка index."""
@@ -100,8 +100,7 @@ class TestPosts(TestCase):
         self.assertIn('group', response.context)
         group = response.context['group']
         self.assertEqual(group.title, TestPosts.group.title)
-        self.assertEqual(group.description, TestPosts.group.description) 
-        
+        self.assertEqual(group.description, TestPosts.group.description)
 
     def test_correct_context_profile(self):
         """Проверка profile."""
@@ -114,7 +113,7 @@ class TestPosts(TestCase):
         self.check_context_contains_page_or_post(response.context)
 
         self.assertIn('author', response.context)
-        self.assertEqual(response.context['author'], TestPosts.user2) 
+        self.assertEqual(response.context['author'], TestPosts.user2)
 
     def test_correct_context_post_detail(self):
         """Проверка post_detail."""
@@ -124,7 +123,7 @@ class TestPosts(TestCase):
         self.check_context_contains_page_or_post(response.context, post=True)
 
         self.assertIn('author', response.context)
-        self.assertEqual(response.context['author'], TestPosts.user2) 
+        self.assertEqual(response.context['author'], TestPosts.user2)
 
     def test_correct_context_post_edit_create(self):
         """Проверка post_edit и create."""
@@ -137,7 +136,7 @@ class TestPosts(TestCase):
         self.assertIn('is_edit', response.context)
         is_edit = response.context['is_edit']
         self.assertIsInstance(is_edit, bool)
-        self.assertEqual(is_edit, True) 
+        self.assertEqual(is_edit, True)
 
 
 class PaginatorViewsTest(TestCase):
@@ -154,7 +153,7 @@ class PaginatorViewsTest(TestCase):
 
     def test_first_page_contains_ten_records(self):
         response = self.authorized_client.get(
-                reverse('posts:index'))
+            reverse('posts:index'))
         self.assertEqual(len(response.context.get('page_obj').object_list), 10)
 
     def test_second_page_contains_four_records(self):

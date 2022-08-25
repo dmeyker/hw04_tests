@@ -42,15 +42,14 @@ class PostFormTests(TestCase):
             reverse('posts:post_create'),
             data={'text': 'Test post', 'group': PostFormTests.group.id},
             follow=True
-)
+        )
 
-        self.assertEqual(response.status_code, HTTPStatus.OK) 
-        self.assertEqual(Post.objects.count(), 1) 
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(Post.objects.count(), 1)
         post = Post.objects.first()
         self.assertEqual(post.text, 'Test post')
         self.assertEqual(post.author, self.user)
-        self.assertEqual(post.group, PostFormTests.group) 
- 
+        self.assertEqual(post.group, PostFormTests.group)
 
     def test_edit_post(self):
         """Валидная форма редактирует запись в Post."""
@@ -58,34 +57,33 @@ class PostFormTests(TestCase):
             text='test',
             author=self.user,
             group=PostFormTests.group
-)
+        )
         new_post_text = 'new text'
         new_group = Group.objects.create(
             title='New Test group',
             slug='new-test-group',
             description='new test description'
-)       
+        )
         self.authorized_client.post(
-            reverse('posts:post_edit', args=[post.id,]),
+            reverse('posts:post_edit', args=[post.id, ]),
             data={'text': new_post_text, 'group': new_group.id},
             follow=True,
-) 
+        )
         self.assertEqual(Post.objects.count(), 1)
         post = Post.objects.first()
         self.assertEqual(post.text, new_post_text)
         self.assertEqual(post.author, self.user)
-        self.assertEqual(post.group, new_group) 
+        self.assertEqual(post.group, new_group)
         """Проверка, что поста нет в прошлой группе"""
-        old_group_response = self.authorized_client.get(
-            reverse('posts:group_list', args=[self.group.slug,])
-)
+        old_gr_resp = self.authorized_client.get(
+            reverse('posts:group_list', args=[self.group.slug, ])
+        )
 
-        self.assertEqual(old_group_response.context['page_obj'].paginator.count, 0)
+        self.assertEqual(old_gr_resp.context['page_obj'].paginator.count, 0)
 
     def test_unauth_user_cant_publish_post(self):
         """Неавторизованный юзер при попытке создать запись
-        направляется на страницу авторизации
-        """
+        направляется на страницу авторизации."""
         posts_count = Post.objects.count()
         response = self.guest_client.post(
             reverse('posts:post_create'),
