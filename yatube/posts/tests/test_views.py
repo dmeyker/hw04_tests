@@ -59,8 +59,8 @@ class TestPosts(TestCase):
 
         cls.user = User.objects.create_user(username='test_user')
         cls.user2 = User.objects.create_user(username='test_user2')
-        cls.authorized_client_author = Client()
-        cls.authorized_client_author.force_login(cls.user2)
+        cls.auth_client_author = Client()
+        cls.auth_client_author.force_login(cls.user2)
 
         cls.group = Group.objects.create(
             title='Тестовый заголовок группы',
@@ -72,6 +72,7 @@ class TestPosts(TestCase):
             author=cls.user2,
             group=cls.group,
         )
+        cls.index_url = ('posts:index', 'posts/index.html', None, None)
 
     def check_context_contains_page_or_post(self, context, post=False):
         if post:
@@ -87,12 +88,12 @@ class TestPosts(TestCase):
 
     def test_correct_context_index(self):
         """Проверка index."""
-        response = self.authorized_client_author.get(reverse('posts:index'))
+        response = self.auth_client_author.get(reverse('posts:index'))
         self.check_context_contains_page_or_post(response.context)
 
     def test_correct_context_group_list(self):
         """Проверка group_list."""
-        response = self.authorized_client_author.get(
+        response = self.auth_client_author.get(
             reverse('posts:group_list', kwargs={'slug': self.group.slug})
         )
         self.check_context_contains_page_or_post(response.context)
@@ -104,7 +105,7 @@ class TestPosts(TestCase):
 
     def test_correct_context_profile(self):
         """Проверка profile."""
-        response = self.authorized_client_author.get(
+        response = self.auth_client_author.get(
             reverse(
                 'posts:profile',
                 kwargs={'username': self.user2.username}
@@ -117,7 +118,7 @@ class TestPosts(TestCase):
 
     def test_correct_context_post_detail(self):
         """Проверка post_detail."""
-        response = self.authorized_client_author.get(
+        response = self.auth_client_author.get(
             reverse('posts:post_detail', kwargs={'post_id': self.post.id})
         )
         self.check_context_contains_page_or_post(response.context, post=True)
@@ -127,7 +128,7 @@ class TestPosts(TestCase):
 
     def test_correct_context_post_edit_create(self):
         """Проверка post_edit и create."""
-        response = self.authorized_client_author.get(
+        response = self.auth_client_author.get(
             reverse('posts:post_edit', kwargs={'post_id': self.post.id})
         )
         self.assertIn('form', response.context)
@@ -136,28 +137,32 @@ class TestPosts(TestCase):
         self.assertIn('is_edit', response.context)
         is_edit = response.context['is_edit']
         self.assertIsInstance(is_edit, bool)
-        self.assertEqual(is_edit, True)
+        self.assertEqual(is_edit, False)
 
+    def test_paginator_in_pages_with_posts(self):
+        """Тест, проверяющий работу пагинатора."""
+        post_count = Post.objects.count()
+        paginator_amount = 10
+        second_page_amount = post_count + 4
 
-class PaginatorViewsTest(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.user = User.objects.create_user(username='test_user')
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.user)
-        for count in range(14):
-            cls.post = Post.objects.create(
-                text=f'Тестовый пост номер {count}',
-                author=cls.user)
+        posts = [
+            Post(
+                text=f'text {num}', author=TestPosts.user,
+                group=TestPosts.group
+            ) for num in range(1, paginator_amount + second_page_amount)
+        ]
+        Post.objects.bulk_create(posts)
 
-    def test_first_page_contains_ten_records(self):
-        response = self.authorized_client.get(
-            reverse('posts:index'))
-        self.assertEqual(len(response.context.get('page_obj').object_list), 10)
-
-    def test_second_page_contains_four_records(self):
-        response = self.authorized_client.get(
-            reverse('posts:index') + '?page=2'
+        pages = (
+            (1, paginator_amount),
+            (2, second_page_amount)
         )
-        self.assertEqual(len(response.context.get('page_obj').object_list), 4)
+
+        for page, count in pages:
+            with self.subTest(page=page):
+                response = self.auth_client_author \
+                    .get(reverse(TestPosts.index_url[0]) + f'?page={page}')
+                self.assertEqual(
+                    len(response.context
+                        .get('page_obj').object_list), count
+                )

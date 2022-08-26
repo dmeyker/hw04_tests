@@ -70,7 +70,7 @@ def post_edit(request, post_id):
         form.save()
         return redirect("posts:post_detail", post_id)
     context = {
-        'is_edit': True,
+        'is_edit': False,
         'form': form,
         'post_id': post_id
     }
