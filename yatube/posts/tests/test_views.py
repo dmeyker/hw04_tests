@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from posts.forms import PostForm
 from posts.models import Group, Post
@@ -67,12 +68,25 @@ class TestPosts(TestCase):
             description='Тестовое описание группы',
             slug='test-slug',
         )
+        cls.small_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        cls.uploaded = SimpleUploadedFile(
+            name='small.gif',
+            content=cls.small_gif,
+            content_type='image/gif'
+        )
         cls.post = Post.objects.create(
-            text='Тестовый текст1',
+            text='Тестовый текст',
             author=cls.user2,
             group=cls.group,
+            image=cls.uploaded
         )
-        cls.index_url = ('posts:index', 'posts/index.html', None, None)
 
     def check_context_contains_page_or_post(self, context, post=False):
         if post:
@@ -85,6 +99,7 @@ class TestPosts(TestCase):
         self.assertEqual(post.pub_date, TestPosts.post.pub_date)
         self.assertEqual(post.text, TestPosts.post.text)
         self.assertEqual(post.group, TestPosts.post.group)
+        self.assertEqual(post.image, TestPosts.post.image)
 
     def test_correct_context_index(self):
         """Проверка index."""
@@ -119,7 +134,7 @@ class TestPosts(TestCase):
     def test_correct_context_post_detail(self):
         """Проверка post_detail."""
         response = self.auth_client_author.get(
-            reverse('posts:post_detail', kwargs={'post_id': self.post.id})
+            reverse('posts:post_detail', kwargs={'post_id': self.post.id},)
         )
         self.check_context_contains_page_or_post(response.context, post=True)
 
@@ -128,41 +143,59 @@ class TestPosts(TestCase):
 
     def test_correct_context_post_edit_create(self):
         """Проверка post_edit и create."""
-        response = self.auth_client_author.get(
+        response1 = self.auth_client_author.get(
             reverse('posts:post_edit', kwargs={'post_id': self.post.id})
         )
+        response2 = self.auth_client_author.get(
+            reverse('posts:post_create')
+        )
+        pages = (
+            response1,
+            response2
+        )
+        for i in range(len(pages)):
+            response = pages[i]
+
         self.assertIn('form', response.context)
         self.assertIsInstance(response.context['form'], PostForm)
-
         self.assertIn('is_edit', response.context)
         is_edit = response.context['is_edit']
         self.assertIsInstance(is_edit, bool)
-        self.assertEqual(is_edit, False)
+        if i == 0:
+            self.assertEqual(is_edit, True)
+        else:
+            self.assertEqual(is_edit, False)
 
     def test_paginator_in_pages_with_posts(self):
-        """Тест, проверяющий работу пагинатора."""
+        """Тест, проверяющий работу пагинатора
+        на страницах индекс, групп и профиль."""
         post_count = Post.objects.count()
         paginator_amount = 10
         second_page_amount = post_count + 4
 
         posts = [
             Post(
-                text=f'text {num}', author=TestPosts.user,
+                text=f'text {num}', author=TestPosts.user2,
                 group=TestPosts.group
             ) for num in range(1, paginator_amount + second_page_amount)
         ]
         Post.objects.bulk_create(posts)
-
-        pages = (
-            (1, paginator_amount),
-            (2, second_page_amount)
+        urls = (
+            reverse('posts:index'),
+            reverse('posts:group_list', kwargs={
+                'slug': TestPosts.group.slug}),
+            reverse('posts:profile', kwargs={
+                'username': TestPosts.user2.username})
         )
-
-        for page, count in pages:
-            with self.subTest(page=page):
-                response = self.auth_client_author \
-                    .get(reverse(TestPosts.index_url[0]) + f'?page={page}')
-                self.assertEqual(
-                    len(response.context
-                        .get('page_obj').object_list), count
-                )
+        for url in urls:
+            pages = (
+                (1, paginator_amount),
+                (2, second_page_amount)
+            )
+            for page, count in pages:
+                with self.subTest(page=page):
+                    response = self.auth_client_author \
+                        .get(url + f'?page={page}')
+                    self.assertEqual(
+                        len(response.context
+                            .get('page_obj').object_list), count)

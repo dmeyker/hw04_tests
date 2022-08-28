@@ -10,8 +10,10 @@
               <div class="card-body">        
                 <form method="post"
                   {% if is_edit %}
+                  <form method="post" enctype="multipart/form-data"
                     action="{% url 'posts:post_edit' post_id %}"
                   {% else %}
+                  <form method="post" enctype="multipart/form-data"
                     action="{% url 'posts:post_create' %}"
                   {% endif %}
                 >
@@ -37,6 +39,15 @@
                     {{ form.group }}
                     <small id="id_group-help" class="form-text text-muted">
                       Группа, к которой будет относиться пост
+                    </small>
+                  </div>
+                  <div class="form-group row my-3 p-3">
+                    <label for="id_image">
+                      Картинка                  
+                    </label>
+                    {{ form.image }}
+                    <small id="id_image-help" class="form-text text-muted">
+                      Выберите картинку для поста
                     </small>
                   </div>
                   <div class="d-flex justify-content-end">

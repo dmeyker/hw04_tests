@@ -5,7 +5,7 @@ from .models import Post
 class PostForm(ModelForm):
     class Meta:
         model = Post
-        fields = {'text': 'Текст', 'group': 'Группа'}
+        fields = {'text': 'Текст', 'group': 'Группа', 'image': 'Картинка'}
         help_texts = {
             'text': 'Текст нового поста',
             'group': 'Группа, к которой будет относиться пост'

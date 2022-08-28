@@ -48,7 +48,7 @@ def post_detail(request, post_id):
 
 @login_required
 def post_create(request):
-    form = PostForm(request.POST)
+    form = PostForm(request.POST, files=request.FILES or None)
     if request.method == 'POST':
         if form.is_valid():
             post = form.save(commit=False)
@@ -56,21 +56,25 @@ def post_create(request):
             post.save()
             return redirect('posts:profile', post.author)
     context = {
-        'is_edit': False
+        'is_edit': False,
+        'form': form,
     }
-    return render(request, 'posts/create_post.html', {'form': form}, context)
+    return render(request, 'posts/create_post.html', context)
 
 
 @login_required
 def post_edit(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
 
-    form = PostForm(request.POST or None, instance=post)
+    form = PostForm(
+        request.POST or None,
+        files=request.FILES or None,
+        instance=post)
     if form.is_valid():
         form.save()
         return redirect("posts:post_detail", post_id)
     context = {
-        'is_edit': False,
+        'is_edit': True,
         'form': form,
         'post_id': post_id
     }
