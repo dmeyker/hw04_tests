@@ -34,6 +34,7 @@ class Post(models.Model):
     )
     pub_date = models.DateTimeField(
         auto_now_add=True,
+        db_index=True,
         verbose_name='Дата публикации поста'
     )
     author = models.ForeignKey(
@@ -64,3 +65,44 @@ class Post(models.Model):
 
     def __str__(self) -> str:
         return self.text[:15]
+
+
+class Comment(models.Model):
+    text = models.TextField(
+        'Текст комментария',
+        help_text='Введите текст комментария',
+        blank=True
+    )
+    created = models.DateTimeField(
+        'Дата публикации комментария',
+        auto_now_add=True,
+        db_index=True
+    )
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='comments',
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='comments'
+    )
+
+class Follow(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='follower'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='following'
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'author'],
+                                    name='unique_follows')
+        ]
